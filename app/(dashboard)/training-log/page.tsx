@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { formatDate, getExpirationDate, getExpirationStatus, getStatusBadge } from '@/lib/utils'
 import type { Employee, Course, TrainingRecord } from '@/lib/types'
+import CertUploadModal from '@/components/cert-upload-modal'
 
 type RecordWithJoins = TrainingRecord & { employee?: Employee; course?: Course }
 
@@ -33,6 +34,7 @@ export default function TrainingLogPage() {
   const [expandedEmployees, setExpandedEmployees] = useState<Set<string>>(new Set())
 
   const [showModal, setShowModal] = useState(false)
+  const [showCertUpload, setShowCertUpload] = useState(false)
   const [editTarget, setEditTarget] = useState<RecordWithJoins | null>(null)
   const [form, setForm] = useState<RecordForm>(emptyForm)
   const [saving, setSaving] = useState(false)
@@ -217,13 +219,22 @@ export default function TrainingLogPage() {
             {records.length} records · {employees.length} employee{employees.length !== 1 ? 's' : ''} · {courses.length} course{courses.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <button
-          onClick={() => openAdd()}
-          className="flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-gray-900 transition"
-        >
-          <Plus className="w-4 h-4" />
-          Log Training
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowCertUpload(true)}
+            className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-lg hover:border-gray-400 hover:text-black transition"
+          >
+            <Upload className="w-4 h-4" />
+            Upload Certificate
+          </button>
+          <button
+            onClick={() => openAdd()}
+            className="flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-gray-900 transition"
+          >
+            <Plus className="w-4 h-4" />
+            Log Training
+          </button>
+        </div>
       </div>
 
       {/* Search + view toggle */}
@@ -559,6 +570,20 @@ export default function TrainingLogPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {showCertUpload && agencyId && (
+        <CertUploadModal
+          agencyId={agencyId}
+          employees={employees}
+          courses={courses}
+          onClose={() => setShowCertUpload(false)}
+          onSaved={(newEmps, newCourses) => {
+            if (newEmps) setEmployees(newEmps)
+            if (newCourses) setCourses(newCourses)
+            fetchData(agencyId)
+          }}
+        />
       )}
 
       {viewingCert && (

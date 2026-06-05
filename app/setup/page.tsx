@@ -152,7 +152,7 @@ export default function SetupPage() {
                     value={agencyName}
                     onChange={(e) => setAgencyName(e.target.value)}
                     className="input"
-                    placeholder="e.g. Cascade Support Services"
+                    placeholder="e.g. Acme Corp, City of Springfield"
                   />
                 </div>
                 <div>
@@ -169,11 +169,11 @@ export default function SetupPage() {
                     onChange={(e) => setRequiredHours(e.target.value)}
                     className="input"
                   />
-                  <p className="text-xs text-gray-400 mt-1.5">Oregon I/DD standard is 24 hours</p>
+                  <p className="text-xs text-gray-400 mt-1.5">A common standard is 24 hours/year — adjust to match your requirements</p>
                 </div>
                 {error && <p className="text-red-600 text-sm bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
                 <button type="submit" disabled={loading} className="btn-primary w-full">
-                  {loading ? 'Setting up…' : 'Launch ClearPath →'}
+                  {loading ? 'Setting up…' : 'Get Started →'}
                 </button>
               </form>
             </>

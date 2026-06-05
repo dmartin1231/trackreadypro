@@ -65,7 +65,7 @@ export default function ImportPage() {
   const [backupCounts, setBackupCounts] = useState<{ employees: number; courses: number; records: number } | null>(null)
   const [backingUp, setBackingUp] = useState<false | 'excel' | 'pdf'>(false)
   const [lastBackup, setLastBackup] = useState<string | null>(null)
-  const [agencyName, setAgencyName] = useState('ClearPath')
+  const [agencyName, setAgencyName] = useState('TrackReady PRO')
   const [agencyId, setAgencyId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -793,7 +793,7 @@ export default function ImportPage() {
             </div>
             <div className="flex-1">
               <p className="font-semibold text-gray-900">Import complete</p>
-              <p className="text-sm text-gray-500">Your data is now in ClearPath</p>
+              <p className="text-sm text-gray-500">Your data has been imported successfully</p>
             </div>
             {/* Undo — opens confirmation modal */}
             <button

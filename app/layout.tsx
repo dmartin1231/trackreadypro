@@ -3,7 +3,7 @@ import './globals.css'
 
 export const metadata: Metadata = {
   title: 'TrackReadyPRO — Compliance Tracker',
-  description: 'Training compliance management for DSP agencies',
+  description: 'Employee training compliance management for any organization.',
 }
 
 export default function RootLayout({
