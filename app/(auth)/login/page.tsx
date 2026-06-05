@@ -1,9 +1,47 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { TrainTrackIcon } from '@/components/traintrack-logo'
+import { CheckCircle2, Clock, FileBarChart2 } from 'lucide-react'
+
+const features = [
+  {
+    icon: CheckCircle2,
+    title: 'Track completions & hours',
+    desc: 'Log training records for every employee and watch compliance build in real time.',
+  },
+  {
+    icon: Clock,
+    title: 'Never miss an expiration',
+    desc: 'Automatic alerts before certifications lapse so renewals never slip through the cracks.',
+  },
+  {
+    icon: FileBarChart2,
+    title: 'Audit-ready reports',
+    desc: 'Generate compliance summaries, transcripts, and gap reports in seconds.',
+  },
+]
+
+function FadeUp({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), delay)
+    return () => clearTimeout(t)
+  }, [delay])
+  return (
+    <div
+      style={{
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0)' : 'translateY(18px)',
+        transition: 'opacity 0.6s ease, transform 0.6s ease',
+      }}
+    >
+      {children}
+    </div>
+  )
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -32,35 +70,56 @@ export default function LoginPage() {
     <div className="min-h-screen flex">
       {/* Left panel */}
       <div className="hidden lg:flex lg:w-1/2 bg-black flex-col justify-between p-12">
-        <div className="flex items-center gap-3">
-          <TrainTrackIcon size={38} />
-          <div>
-            <p className="text-white font-bold text-sm leading-none tracking-[0.08em] uppercase">TrackReady<span className="text-[#E24B4A]">PRO</span></p>
-            <p className="text-[#E24B4A] text-[10px] font-semibold tracking-[0.15em] uppercase mt-0.5">Compliance Tracker</p>
+        <FadeUp delay={0}>
+          <div className="flex items-center gap-3">
+            <TrainTrackIcon size={38} />
+            <div>
+              <p className="text-white font-bold text-sm leading-none tracking-[0.08em] uppercase">
+                TrackReady<span className="text-[#E24B4A]">PRO</span>
+              </p>
+              <p className="text-[#E24B4A] text-[10px] font-semibold tracking-[0.15em] uppercase mt-0.5">
+                Compliance Tracker
+              </p>
+            </div>
+          </div>
+        </FadeUp>
+
+        <div className="space-y-6">
+          <FadeUp delay={150}>
+            <h1 className="text-4xl font-bold text-white leading-tight">
+              Employee Training<br />Compliance,<br />Simplified.
+            </h1>
+          </FadeUp>
+
+          <FadeUp delay={300}>
+            <p className="text-gray-300 text-lg leading-relaxed">
+              TrackReady PRO helps organizations manage staff training records,
+              monitor certification deadlines, and stay audit-ready — all in one place.
+            </p>
+          </FadeUp>
+
+          <div className="space-y-4 pt-2">
+            {features.map(({ icon: Icon, title, desc }, i) => (
+              <FadeUp key={title} delay={450 + i * 130}>
+                <div className="flex items-start gap-4">
+                  <div className="w-9 h-9 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <Icon className="w-4 h-4 text-[#E24B4A]" />
+                  </div>
+                  <div>
+                    <p className="text-white font-semibold text-sm">{title}</p>
+                    <p className="text-gray-400 text-sm leading-snug mt-0.5">{desc}</p>
+                  </div>
+                </div>
+              </FadeUp>
+            ))}
           </div>
         </div>
 
-        <div>
-          <h1 className="text-4xl font-bold text-white leading-tight mb-4">
-            DSP Training<br />Compliance,<br />Simplified.
-          </h1>
-          <p className="text-gray-300 text-lg">
-            Track certifications, manage training hours, and keep your team compliant — all in one place.
+        <FadeUp delay={900}>
+          <p className="text-gray-600 text-xs">
+            Secure · Multi-tenant · Built for compliance-driven teams
           </p>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4">
-          {[
-            { label: 'Required Hours', value: '24/yr' },
-            { label: 'Cert Tracking', value: '100%' },
-            { label: 'Agencies', value: 'OR I/DD' },
-          ].map((stat) => (
-            <div key={stat.label} className="bg-white/10 rounded-xl p-4">
-              <p className="text-white font-bold text-2xl">{stat.value}</p>
-              <p className="text-gray-400 text-sm mt-1">{stat.label}</p>
-            </div>
-          ))}
-        </div>
+        </FadeUp>
       </div>
 
       {/* Right panel */}
@@ -69,8 +128,12 @@ export default function LoginPage() {
           <div className="flex items-center gap-3 mb-8 lg:hidden">
             <TrainTrackIcon size={36} dark />
             <div>
-              <p className="font-bold text-sm leading-none text-black tracking-[0.08em] uppercase">TrackReady<span className="text-[#E24B4A]">PRO</span></p>
-              <p className="text-[#E24B4A] text-[10px] font-semibold tracking-[0.15em] uppercase mt-0.5">Compliance Tracker</p>
+              <p className="font-bold text-sm leading-none text-black tracking-[0.08em] uppercase">
+                TrackReady<span className="text-[#E24B4A]">PRO</span>
+              </p>
+              <p className="text-[#E24B4A] text-[10px] font-semibold tracking-[0.15em] uppercase mt-0.5">
+                Compliance Tracker
+              </p>
             </div>
           </div>
 
