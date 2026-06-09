@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Plus, Search, Edit2, X, User, BookOpen, ShieldCheck } from 'lucide-react'
 import { formatDate, getInitials, getExpirationStatus, getStatusBadge } from '@/lib/utils'
 import type { Employee, TrainingRecord, Course } from '@/lib/types'
+import { useUserRole } from '@/components/role-provider'
 
 type EmployeeForm = {
   name: string
@@ -19,6 +20,7 @@ const emptyForm: EmployeeForm = { name: '', employee_number: '', hire_date: '', 
 export default function EmployeesPage() {
   const supabase = createClient()
   const router = useRouter()
+  const isAdmin = useUserRole() === 'admin'
   const [employees, setEmployees] = useState<Employee[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
@@ -136,13 +138,15 @@ export default function EmployeesPage() {
           <h1 className="text-2xl font-bold text-gray-900">Employees</h1>
           <p className="text-gray-500 text-sm mt-1">{employees.length} total employees</p>
         </div>
-        <button
-          onClick={openAdd}
-          className="flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-gray-900 transition"
-        >
-          <Plus className="w-4 h-4" />
-          Add Employee
-        </button>
+        {isAdmin && (
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-gray-900 transition"
+          >
+            <Plus className="w-4 h-4" />
+            Add Employee
+          </button>
+        )}
       </div>
 
       {/* Search */}
@@ -206,12 +210,14 @@ export default function EmployeesPage() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <button
-                        onClick={(e) => openEdit(emp, e)}
-                        className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-black border border-gray-200 hover:border-black px-2.5 py-1.5 rounded-lg transition"
-                      >
-                        <Edit2 className="w-3 h-3" /> Edit
-                      </button>
+                      {isAdmin && (
+                        <button
+                          onClick={(e) => openEdit(emp, e)}
+                          className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-black border border-gray-200 hover:border-black px-2.5 py-1.5 rounded-lg transition"
+                        >
+                          <Edit2 className="w-3 h-3" /> Edit
+                        </button>
+                      )}
                       <button
                         onClick={(e) => { e.stopPropagation(); openHistory(emp) }}
                         className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-black border border-gray-200 hover:border-black px-2.5 py-1.5 rounded-lg transition"

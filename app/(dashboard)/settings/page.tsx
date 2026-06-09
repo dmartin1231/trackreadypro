@@ -2,10 +2,13 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Settings, CheckCircle2, Trash2, AlertTriangle, Calendar, Clock, RotateCcw } from 'lucide-react'
+import { Settings, CheckCircle2, Trash2, AlertTriangle, Calendar, Clock, RotateCcw, Users, UserPlus, Crown, Eye, Loader2, X, Mail } from 'lucide-react'
 import type { Agency } from '@/lib/types'
 import type { TrainingPeriod } from '@/lib/training-period'
 import { MONTH_NAMES } from '@/lib/training-period'
+import { useUserRole } from '@/components/role-provider'
+
+type TeamMember = { id: string; email: string; role: string }
 
 const PERIOD_OPTIONS: { value: TrainingPeriod; label: string; description: string }[] = [
   {
@@ -32,6 +35,7 @@ const PERIOD_OPTIONS: { value: TrainingPeriod; label: string; description: strin
 
 export default function SettingsPage() {
   const supabase = createClient()
+  const userRole = useUserRole()
   const [agency, setAgency] = useState<Agency | null>(null)
   const [name, setName] = useState('')
   const [requiredHours, setRequiredHours] = useState('24')
@@ -49,10 +53,23 @@ export default function SettingsPage() {
   const [undoImportError, setUndoImportError] = useState<string | null>(null)
   const [undoImportDone, setUndoImportDone]   = useState(false)
 
+  // Team management
+  const [members, setMembers]         = useState<TeamMember[]>([])
+  const [loadingTeam, setLoadingTeam] = useState(true)
+  const [showInvite, setShowInvite]   = useState(false)
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole]   = useState<'admin' | 'viewer'>('viewer')
+  const [inviting, setInviting]       = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  const [inviteDone, setInviteDone]   = useState(false)
+  const [removingId, setRemovingId]   = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string>('')
+
   useEffect(() => {
     async function init() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
+      setCurrentUserId(user.id)
       const { data: profile } = await supabase.from('user_profiles').select('agency_id').eq('id', user.id).single()
       if (!profile?.agency_id) return
       const { data: agencyData } = await supabase.from('agencies').select('*').eq('id', profile.agency_id).single()
@@ -66,6 +83,50 @@ export default function SettingsPage() {
     }
     init()
   }, [supabase])
+
+  useEffect(() => {
+    async function loadTeam() {
+      setLoadingTeam(true)
+      const res = await fetch('/api/team')
+      const json = await res.json()
+      setMembers(json.members ?? [])
+      setLoadingTeam(false)
+    }
+    loadTeam()
+  }, [])
+
+  async function handleInvite(e: React.FormEvent) {
+    e.preventDefault()
+    setInviting(true)
+    setInviteError(null)
+    const res = await fetch('/api/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: inviteEmail.trim(), role: inviteRole }),
+    })
+    const json = await res.json()
+    setInviting(false)
+    if (!res.ok) { setInviteError(json.error ?? 'Failed to send invite'); return }
+    setInviteDone(true)
+    setInviteEmail('')
+    setShowInvite(false)
+    // Refresh list
+    const teamRes = await fetch('/api/team')
+    setMembers((await teamRes.json()).members ?? [])
+    setTimeout(() => setInviteDone(false), 4000)
+  }
+
+  async function handleRemove(memberId: string) {
+    if (!confirm('Remove this team member? They will lose access immediately.')) return
+    setRemovingId(memberId)
+    await fetch('/api/team', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ memberId }),
+    })
+    setMembers(m => m.filter(x => x.id !== memberId))
+    setRemovingId(null)
+  }
 
   async function handleSave(e: React.FormEvent) {
     e.preventDefault()
@@ -284,6 +345,117 @@ export default function SettingsPage() {
             </div>
             <span className="inline-flex px-3 py-1 rounded-full text-xs font-semibold bg-black text-white">Admin</span>
           </div>
+        </div>
+      </div>
+
+      {/* Team Members */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mt-6">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-black/10 rounded-lg flex items-center justify-center">
+              <Users className="w-4 h-4 text-black" />
+            </div>
+            <h2 className="font-semibold text-gray-900">Team Members</h2>
+          </div>
+          {userRole === 'admin' && (
+            <button
+              onClick={() => { setShowInvite(v => !v); setInviteError(null) }}
+              className="flex items-center gap-1.5 text-sm font-medium text-black border border-gray-200 hover:border-black px-3 py-1.5 rounded-lg transition-colors"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              Invite Member
+            </button>
+          )}
+        </div>
+
+        {/* Invite form */}
+        {showInvite && userRole === 'admin' && (
+          <div className="px-6 py-4 bg-gray-50 border-b border-gray-100">
+            <form onSubmit={handleInvite} className="flex items-end gap-3 flex-wrap">
+              <div className="flex-1 min-w-48">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Email address</label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400" />
+                  <input
+                    type="email"
+                    required
+                    value={inviteEmail}
+                    onChange={e => setInviteEmail(e.target.value)}
+                    placeholder="colleague@organization.com"
+                    className="input pl-9 text-sm"
+                  />
+                </div>
+              </div>
+              <div className="w-40">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Role</label>
+                <select
+                  value={inviteRole}
+                  onChange={e => setInviteRole(e.target.value as 'admin' | 'viewer')}
+                  className="input text-sm"
+                >
+                  <option value="viewer">Viewer — read only</option>
+                  <option value="admin">Admin — full access</option>
+                </select>
+              </div>
+              <div className="flex items-center gap-2">
+                <button type="button" onClick={() => setShowInvite(false)} className="btn-secondary text-sm px-3 py-2">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+                <button type="submit" disabled={inviting} className="btn-primary text-sm px-4 py-2">
+                  {inviting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Send Invite'}
+                </button>
+              </div>
+            </form>
+            {inviteError && <p className="text-red-600 text-xs mt-2">{inviteError}</p>}
+          </div>
+        )}
+
+        {inviteDone && (
+          <div className="px-6 py-3 bg-green-50 border-b border-green-100 flex items-center gap-2 text-sm text-green-700">
+            <CheckCircle2 className="w-4 h-4" /> Invite sent! They'll receive an email to set up their account.
+          </div>
+        )}
+
+        <div className="divide-y divide-gray-50">
+          {loadingTeam ? (
+            <div className="px-6 py-4 text-sm text-gray-400 flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" /> Loading team…
+            </div>
+          ) : members.length === 0 ? (
+            <div className="px-6 py-4 text-sm text-gray-400">No team members found.</div>
+          ) : members.map(member => (
+            <div key={member.id} className="px-6 py-4 flex items-center gap-4">
+              <div className="w-9 h-9 rounded-full bg-gray-100 flex items-center justify-center flex-shrink-0">
+                {member.role === 'admin'
+                  ? <Crown className="w-4 h-4 text-black" />
+                  : <Eye className="w-4 h-4 text-gray-500" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 truncate">{member.email}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {member.role === 'admin' ? 'Admin — full access' : 'Viewer — read only'}
+                  {member.id === currentUserId && <span className="ml-1.5 text-gray-300">(you)</span>}
+                </p>
+              </div>
+              <span className={`text-[10px] font-bold uppercase tracking-wide px-2.5 py-0.5 rounded-full ${
+                member.role === 'admin' ? 'bg-black text-white' : 'bg-gray-100 text-gray-500'
+              }`}>
+                {member.role}
+              </span>
+              {userRole === 'admin' && member.id !== currentUserId && (
+                <button
+                  onClick={() => handleRemove(member.id)}
+                  disabled={removingId === member.id}
+                  className="text-gray-300 hover:text-red-500 transition p-1.5 rounded-lg hover:bg-red-50"
+                  title="Remove member"
+                >
+                  {removingId === member.id
+                    ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    : <Trash2 className="w-3.5 h-3.5" />}
+                </button>
+              )}
+            </div>
+          ))}
         </div>
       </div>
 

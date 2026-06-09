@@ -9,6 +9,7 @@ import {
 import { formatDate, getExpirationDate, getExpirationStatus, getStatusBadge } from '@/lib/utils'
 import type { Employee, Course, TrainingRecord } from '@/lib/types'
 import CertUploadModal from '@/components/cert-upload-modal'
+import { useUserRole } from '@/components/role-provider'
 
 type RecordWithJoins = TrainingRecord & { employee?: Employee; course?: Course }
 
@@ -23,6 +24,8 @@ const emptyForm: RecordForm = { employee_id: '', course_id: '', completed_date: 
 
 export default function TrainingLogPage() {
   const supabase = createClient()
+  const userRole = useUserRole()
+  const isAdmin = userRole === 'admin'
   const [agencyId, setAgencyId] = useState<string | null>(null)
   const [employees, setEmployees] = useState<Employee[]>([])
   const [courses, setCourses] = useState<Course[]>([])
@@ -219,22 +222,24 @@ export default function TrainingLogPage() {
             {records.length} records · {employees.length} employee{employees.length !== 1 ? 's' : ''} · {courses.length} course{courses.length !== 1 ? 's' : ''}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowCertUpload(true)}
-            className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-lg hover:border-gray-400 hover:text-black transition"
-          >
-            <Upload className="w-4 h-4" />
-            Upload Certificate
-          </button>
-          <button
-            onClick={() => openAdd()}
-            className="flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-gray-900 transition"
-          >
-            <Plus className="w-4 h-4" />
-            Log Training
-          </button>
-        </div>
+        {isAdmin && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowCertUpload(true)}
+              className="flex items-center gap-2 bg-white border border-gray-200 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-lg hover:border-gray-400 hover:text-black transition"
+            >
+              <Upload className="w-4 h-4" />
+              Upload Certificate
+            </button>
+            <button
+              onClick={() => openAdd()}
+              className="flex items-center gap-2 bg-black text-white text-sm font-medium px-4 py-2.5 rounded-lg hover:bg-gray-900 transition"
+            >
+              <Plus className="w-4 h-4" />
+              Log Training
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Search + view toggle */}
@@ -376,10 +381,12 @@ export default function TrainingLogPage() {
                                 ) : <span className="text-gray-300 text-xs">—</span>}
                               </td>
                               <td className="px-4 py-3">
+                                {isAdmin && (
                                 <div className="flex items-center gap-1">
                                   <button onClick={() => openEdit(rec)} className="text-gray-400 hover:text-black transition p-1.5 rounded-lg hover:bg-gray-100"><Edit2 className="w-3.5 h-3.5" /></button>
                                   <button onClick={() => handleDelete(rec.id)} className="text-gray-400 hover:text-red-500 transition p-1.5 rounded-lg hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /></button>
                                 </div>
+                              )}
                               </td>
                             </tr>
                           )
@@ -488,10 +495,12 @@ export default function TrainingLogPage() {
                                 ) : <span className="text-gray-300 text-xs">—</span>}
                               </td>
                               <td className="px-4 py-3">
+                                {isAdmin && (
                                 <div className="flex items-center gap-1">
                                   <button onClick={() => openEdit(rec)} className="text-gray-400 hover:text-black transition p-1.5 rounded-lg hover:bg-gray-100"><Edit2 className="w-3.5 h-3.5" /></button>
                                   <button onClick={() => handleDelete(rec.id)} className="text-gray-400 hover:text-red-500 transition p-1.5 rounded-lg hover:bg-red-50"><Trash2 className="w-3.5 h-3.5" /></button>
                                 </div>
+                              )}
                               </td>
                             </tr>
                           )

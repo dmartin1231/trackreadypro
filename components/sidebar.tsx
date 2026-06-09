@@ -31,9 +31,11 @@ const navItems = [
 export default function Sidebar({
   agencyName,
   userEmail,
+  role = 'admin',
 }: {
   agencyName: string
   userEmail: string
+  role?: string
 }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -96,7 +98,7 @@ export default function Sidebar({
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-white text-xs font-medium truncate">{userEmail}</p>
-            <p className="text-gray-500 text-[10px]">Admin</p>
+            <p className="text-gray-500 text-[10px] capitalize">{role === 'admin' ? 'Admin' : 'Viewer'}</p>
           </div>
           <button
             onClick={handleLogout}
