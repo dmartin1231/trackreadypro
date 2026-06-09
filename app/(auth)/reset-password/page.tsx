@@ -15,33 +15,47 @@ export default function ResetPasswordPage() {
   const [errorMsg, setErrorMsg] = useState('')
   const router = useRouter()
 
-  // Exchange the one-time code for a session — must happen client-side
   useEffect(() => {
-    async function verify() {
-      const params = new URLSearchParams(window.location.search)
-      const code = params.get('code')
+    const supabase = createClient()
+    let resolved = false
 
-      if (!code) {
-        setErrorMsg('Invalid or missing reset link. Please request a new one.')
-        setStage('error')
-        return
-      }
-
-      try {
-        const supabase = createClient()
-        const { error } = await supabase.auth.exchangeCodeForSession(code)
-        if (error) {
-          setErrorMsg('This reset link has expired or already been used. Please request a new one.')
-          setStage('error')
-        } else {
-          setStage('form')
-        }
-      } catch (err: any) {
-        setErrorMsg(err?.message ?? 'Failed to verify reset link.')
+    function resolve(success: boolean, msg = '') {
+      if (resolved) return
+      resolved = true
+      if (success) {
+        setStage('form')
+      } else {
+        setErrorMsg(msg || 'This reset link has expired or already been used. Please request a new one.')
         setStage('error')
       }
     }
-    verify()
+
+    // Handle hash-fragment flow: Supabase fires PASSWORD_RECOVERY when it
+    // processes #access_token=...&type=recovery from the email link
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if ((event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') && session) {
+        resolve(true)
+      }
+    })
+
+    // Also handle PKCE code flow (?code= in URL)
+    async function tryCodeExchange() {
+      const code = new URLSearchParams(window.location.search).get('code')
+      if (!code) return
+      try {
+        const { error } = await supabase.auth.exchangeCodeForSession(code)
+        if (!error) resolve(true)
+      } catch { /* let timeout handle it */ }
+    }
+    tryCodeExchange()
+
+    // If nothing fires after 5 seconds the link is bad
+    const timeout = setTimeout(() => resolve(false), 5000)
+
+    return () => {
+      subscription.unsubscribe()
+      clearTimeout(timeout)
+    }
   }, [])
 
   async function handleSubmit(e: React.FormEvent) {
@@ -80,7 +94,6 @@ export default function ResetPasswordPage() {
           </div>
         </div>
 
-        {/* Verifying link */}
         {stage === 'verifying' && (
           <div className="flex items-center gap-3 text-gray-500">
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -88,7 +101,6 @@ export default function ResetPasswordPage() {
           </div>
         )}
 
-        {/* Invalid / expired link */}
         {stage === 'error' && (
           <div>
             <h2 className="text-2xl font-bold text-gray-900 mb-2">Link not valid</h2>
@@ -102,7 +114,6 @@ export default function ResetPasswordPage() {
           </div>
         )}
 
-        {/* Password form */}
         {stage === 'form' && (
           <>
             <h2 className="text-2xl font-bold text-gray-900 mb-1">Choose a new password</h2>
@@ -159,7 +170,6 @@ export default function ResetPasswordPage() {
           </>
         )}
 
-        {/* Success */}
         {stage === 'done' && (
           <div className="text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
