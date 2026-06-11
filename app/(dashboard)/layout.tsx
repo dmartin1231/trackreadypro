@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import Sidebar from '@/components/sidebar'
 import { RoleProvider } from '@/components/role-provider'
+import TrialBanner from '@/components/trial-banner'
 
 export default async function DashboardLayout({
   children,
@@ -50,7 +51,7 @@ export default async function DashboardLayout({
 
   const { data: agency } = await supabase
     .from('agencies')
-    .select('name')
+    .select('name, plan_type, trial_ends_at, subscription_status')
     .eq('id', profile!.agency_id)
     .single()
 
@@ -64,9 +65,16 @@ export default async function DashboardLayout({
           userEmail={user.email ?? ''}
           role={role}
         />
-        <main className="flex-1 overflow-y-auto">
-          {children}
-        </main>
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <TrialBanner
+            trialEndsAt={agency?.trial_ends_at ?? null}
+            planType={agency?.plan_type ?? null}
+            subscriptionStatus={agency?.subscription_status ?? null}
+          />
+          <main className="flex-1 overflow-y-auto">
+            {children}
+          </main>
+        </div>
       </div>
     </RoleProvider>
   )

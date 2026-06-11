@@ -2,11 +2,14 @@
 
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Settings, CheckCircle2, Trash2, AlertTriangle, Calendar, Clock, RotateCcw, Users, UserPlus, Crown, Eye, Loader2, X, Mail } from 'lucide-react'
+import { Settings, CheckCircle2, Trash2, AlertTriangle, Calendar, Clock, RotateCcw, Users, UserPlus, Crown, Eye, Loader2, X, Mail, CreditCard, Zap, ExternalLink } from 'lucide-react'
 import type { Agency } from '@/lib/types'
 import type { TrainingPeriod } from '@/lib/training-period'
 import { MONTH_NAMES } from '@/lib/training-period'
 import { useUserRole } from '@/components/role-provider'
+import { PLANS, getPlanMaxEmployees, getPlanName, type PlanKey } from '@/lib/plans'
+import Link from 'next/link'
+import { differenceInDays, parseISO } from 'date-fns'
 
 type TeamMember = { id: string; email: string; role: string }
 
@@ -53,6 +56,10 @@ export default function SettingsPage() {
   const [undoImportError, setUndoImportError] = useState<string | null>(null)
   const [undoImportDone, setUndoImportDone]   = useState(false)
 
+  // Billing
+  const [billingPortalLoading, setBillingPortalLoading] = useState(false)
+  const [employeeCount, setEmployeeCount] = useState(0)
+
   // Team management
   const [members, setMembers]         = useState<TeamMember[]>([])
   const [loadingTeam, setLoadingTeam] = useState(true)
@@ -80,6 +87,8 @@ export default function SettingsPage() {
         setTrainingPeriod(agencyData.training_period ?? 'calendar_year')
         setFiscalStartMonth(agencyData.fiscal_year_start_month ?? 1)
       }
+      const { count } = await supabase.from('employees').select('id', { count: 'exact', head: true }).eq('agency_id', profile.agency_id)
+      setEmployeeCount(count ?? 0)
     }
     init()
   }, [supabase])
@@ -126,6 +135,15 @@ export default function SettingsPage() {
     })
     setMembers(m => m.filter(x => x.id !== memberId))
     setRemovingId(null)
+  }
+
+  async function openBillingPortal() {
+    setBillingPortalLoading(true)
+    const res = await fetch('/api/stripe/portal', { method: 'POST' })
+    const json = await res.json()
+    setBillingPortalLoading(false)
+    if (json.url) window.location.href = json.url
+    else alert(json.error ?? 'Could not open billing portal')
   }
 
   async function handleSave(e: React.FormEvent) {
@@ -456,6 +474,84 @@ export default function SettingsPage() {
               )}
             </div>
           ))}
+        </div>
+      </div>
+
+      {/* Billing */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden mt-6">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-black/10 rounded-lg flex items-center justify-center">
+              <CreditCard className="w-4 h-4 text-black" />
+            </div>
+            <h2 className="font-semibold text-gray-900">Billing</h2>
+          </div>
+          <Link href="/pricing" className="flex items-center gap-1.5 text-xs font-semibold text-[#E24B4A] hover:text-red-600 transition">
+            <Zap className="w-3.5 h-3.5" /> View all plans
+          </Link>
+        </div>
+        <div className="px-6 py-6 space-y-5">
+          {/* Plan + status */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-700">Current plan</p>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-lg font-bold text-gray-900">{getPlanName(agency?.plan_type ?? null)}</span>
+                {agency?.subscription_status && (
+                  <span className={`text-[10px] font-bold uppercase tracking-wide px-2 py-0.5 rounded-full ${
+                    agency.subscription_status === 'active' ? 'bg-green-100 text-green-700' :
+                    agency.subscription_status === 'trialing' ? 'bg-blue-100 text-blue-700' :
+                    agency.subscription_status === 'past_due' ? 'bg-red-100 text-red-700' :
+                    'bg-gray-100 text-gray-500'
+                  }`}>
+                    {agency.subscription_status === 'trialing' ? 'Trial' : agency.subscription_status}
+                  </span>
+                )}
+              </div>
+              {agency?.plan_type === 'trial' && agency.trial_ends_at && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {Math.max(0, differenceInDays(parseISO(agency.trial_ends_at), new Date()))} days remaining in trial
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              {agency?.stripe_customer_id && (
+                <button
+                  onClick={openBillingPortal}
+                  disabled={billingPortalLoading}
+                  className="flex items-center gap-1.5 text-sm font-medium border border-gray-200 hover:border-gray-400 px-3 py-2 rounded-lg transition"
+                >
+                  {billingPortalLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                  Manage Billing
+                </button>
+              )}
+              <Link href="/pricing" className="flex items-center gap-1.5 text-sm font-semibold bg-black text-white hover:bg-gray-800 px-3 py-2 rounded-lg transition">
+                <Zap className="w-3.5 h-3.5" />
+                {agency?.plan_type === 'trial' ? 'Subscribe' : 'Upgrade'}
+              </Link>
+            </div>
+          </div>
+
+          {/* Employee usage */}
+          {agency?.plan_type && agency.plan_type !== 'trial' && (
+            <div>
+              <div className="flex items-center justify-between text-sm mb-1.5">
+                <span className="text-gray-600">Employees used</span>
+                <span className="font-medium text-gray-900">
+                  {employeeCount} / {getPlanMaxEmployees(agency.plan_type) === Infinity ? '∞' : getPlanMaxEmployees(agency.plan_type)}
+                </span>
+              </div>
+              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                <div
+                  className={`h-full rounded-full transition-all ${
+                    employeeCount / getPlanMaxEmployees(agency.plan_type) > 0.9 ? 'bg-red-500' :
+                    employeeCount / getPlanMaxEmployees(agency.plan_type) > 0.7 ? 'bg-yellow-500' : 'bg-black'
+                  }`}
+                  style={{ width: `${Math.min(100, (employeeCount / (getPlanMaxEmployees(agency.plan_type) || 1)) * 100)}%` }}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

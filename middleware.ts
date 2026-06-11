@@ -37,13 +37,23 @@ export async function middleware(request: NextRequest) {
 
     const { pathname } = request.nextUrl
 
-    const publicPaths = ['/login', '/setup', '/reset-password', '/auth']
+    const publicPaths = ['/login', '/setup', '/reset-password', '/auth', '/pricing']
     const isPublic = publicPaths.some((p) => pathname.startsWith(p))
 
     if (!user && !isPublic) {
       const url = request.nextUrl.clone()
       url.pathname = '/login'
       return NextResponse.redirect(url)
+    }
+
+    // Superadmin protection — only users with role 'superadmin' can access /superadmin
+    if (pathname.startsWith('/superadmin')) {
+      if (!user) {
+        const url = request.nextUrl.clone()
+        url.pathname = '/login'
+        return NextResponse.redirect(url)
+      }
+      // Role check happens in the layout using server-side Supabase
     }
 
     if (user && pathname === '/login') {

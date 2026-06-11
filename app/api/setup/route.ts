@@ -20,10 +20,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid session' }, { status: 401 })
   }
 
-  // Create agency
+  // Create agency with 15-day trial
+  const trialEndsAt = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString()
   const { data: agency, error: agencyErr } = await adminClient
     .from('agencies')
-    .insert({ name: agencyName.trim(), required_hours: Number(requiredHours) })
+    .insert({
+      name: agencyName.trim(),
+      required_hours: Number(requiredHours),
+      plan_type: 'trial',
+      trial_ends_at: trialEndsAt,
+      subscription_status: 'trialing',
+    })
     .select()
     .single()
 

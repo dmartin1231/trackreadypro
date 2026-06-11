@@ -7,6 +7,8 @@ import { Plus, Search, Edit2, X, User, BookOpen, ShieldCheck } from 'lucide-reac
 import { formatDate, getInitials, getExpirationStatus, getStatusBadge } from '@/lib/utils'
 import type { Employee, TrainingRecord, Course } from '@/lib/types'
 import { useUserRole } from '@/components/role-provider'
+import PlanLimitModal from '@/components/plan-limit-modal'
+import { getPlanMaxEmployees } from '@/lib/plans'
 
 type EmployeeForm = {
   name: string
@@ -30,6 +32,8 @@ export default function EmployeesPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [agencyId, setAgencyId] = useState<string | null>(null)
+  const [agencyPlan, setAgencyPlan] = useState<string | null>(null)
+  const [showLimitModal, setShowLimitModal] = useState(false)
 
   // Training history modal
   const [historyEmployee, setHistoryEmployee] = useState<Employee | null>(null)
@@ -44,6 +48,10 @@ export default function EmployeesPage() {
       .select('agency_id')
       .eq('id', user.id)
       .single()
+    if (data?.agency_id) {
+      const { data: ag } = await supabase.from('agencies').select('plan_type').eq('id', data.agency_id).single()
+      setAgencyPlan(ag?.plan_type ?? null)
+    }
     setAgencyId(data?.agency_id ?? null)
   }, [supabase])
 
@@ -79,6 +87,8 @@ export default function EmployeesPage() {
   }
 
   function openAdd() {
+    const max = getPlanMaxEmployees(agencyPlan)
+    if (employees.length >= max) { setShowLimitModal(true); return }
     setEditTarget(null)
     setForm(emptyForm)
     setError(null)
@@ -341,6 +351,14 @@ export default function EmployeesPage() {
             </div>
           )}
         </Modal>
+      )}
+
+      {showLimitModal && (
+        <PlanLimitModal
+          currentPlan={agencyPlan}
+          maxEmployees={getPlanMaxEmployees(agencyPlan)}
+          onClose={() => setShowLimitModal(false)}
+        />
       )}
     </div>
   )

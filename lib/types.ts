@@ -5,6 +5,12 @@ export type Agency = {
   training_period: 'calendar_year' | 'hire_date' | 'fiscal_year' | 'license_renewal'
   fiscal_year_start_month: number  // 1–12
   created_at: string
+  // Stripe billing
+  stripe_customer_id: string | null
+  stripe_subscription_id: string | null
+  plan_type: 'trial' | 'starter' | 'professional' | 'agency' | 'enterprise' | null
+  trial_ends_at: string | null
+  subscription_status: 'active' | 'past_due' | 'canceled' | 'trialing' | null
 }
 
 export type Employee = {
