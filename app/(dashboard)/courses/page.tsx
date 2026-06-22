@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { Plus, Edit2, Trash2, Library, X } from 'lucide-react'
+import { Plus, Edit2, Trash2, Library, X, BellOff, Bell } from 'lucide-react'
 import { expiresYearsLabel } from '@/lib/utils'
 import type { Course } from '@/lib/types'
 
@@ -97,6 +97,14 @@ export default function CoursesPage() {
     fetchCourses(agencyId)
   }
 
+  async function toggleTracking(course: Course) {
+    if (!agencyId) return
+    await supabase.from('courses')
+      .update({ track_expiration: !course.track_expiration })
+      .eq('id', course.id)
+    fetchCourses(agencyId)
+  }
+
   async function handleDelete(id: string) {
     if (!agencyId || !confirm('Delete this course? Existing training records will remain.')) return
     await supabase.from('courses').delete().eq('id', id)
@@ -156,13 +164,33 @@ export default function CoursesPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        course.expires_years === null
-                          ? 'bg-gray-100 text-gray-600'
-                          : 'bg-amber-100 text-amber-700'
-                      }`}>
-                        {expiresYearsLabel(course.expires_years)}
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          course.expires_years === null
+                            ? 'bg-gray-100 text-gray-600'
+                            : course.track_expiration === false
+                            ? 'bg-gray-100 text-gray-400 line-through'
+                            : 'bg-amber-100 text-amber-700'
+                        }`}>
+                          {expiresYearsLabel(course.expires_years)}
+                        </span>
+                        {course.expires_years !== null && (
+                          <button
+                            onClick={() => toggleTracking(course)}
+                            title={course.track_expiration === false ? 'Expiration tracking off — click to enable' : 'Click to stop tracking expiration'}
+                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium border transition-colors ${
+                              course.track_expiration === false
+                                ? 'border-gray-300 text-gray-400 hover:border-black hover:text-black'
+                                : 'border-gray-200 text-gray-400 hover:border-red-300 hover:text-red-500 hover:bg-red-50'
+                            }`}
+                          >
+                            {course.track_expiration === false
+                              ? <><Bell className="w-3 h-3" /> Track</>
+                              : <><BellOff className="w-3 h-3" /> Don&apos;t track</>
+                            }
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-2">

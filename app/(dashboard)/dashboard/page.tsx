@@ -95,7 +95,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
   const expiredCertsPerEmployee: Record<string, number> = {}
   latestCertRecords.forEach((r) => {
     const course = courseMap[r.course_id]
-    if (!course || course.expires_years === null) return
+    if (!course || course.expires_years === null || course.track_expiration === false) return
     const expDate = addYears(parseISO(r.completed_date), course.expires_years)
     if (expDate < today) {
       expiredCertsPerEmployee[r.employee_id] = (expiredCertsPerEmployee[r.employee_id] ?? 0) + 1
@@ -106,7 +106,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: {
   const expiringPerEmployee: Record<string, number> = {}
   latestCertRecords.forEach((r) => {
     const course = courseMap[r.course_id]
-    if (!course || course.expires_years === null) return
+    if (!course || course.expires_years === null || course.track_expiration === false) return
     const expDate = addYears(parseISO(r.completed_date), course.expires_years)
     const daysLeft = differenceInDays(expDate, today)
     if (daysLeft >= 0 && daysLeft <= 30) {

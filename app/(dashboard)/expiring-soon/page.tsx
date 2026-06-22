@@ -54,7 +54,7 @@ export default function ExpiringSoonPage() {
     })
 
     latestRecords.forEach((rec: TrainingRecord & { employee: Employee; course: Course }) => {
-      if (!rec.course || rec.course.expires_years === null) return
+      if (!rec.course || rec.course.expires_years === null || rec.course.track_expiration === false) return
       const expDate = addYears(parseISO(rec.completed_date), rec.course.expires_years)
       const days = differenceInDays(expDate, today)
       const enriched: ExpiringRecord = {

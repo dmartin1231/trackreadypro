@@ -31,6 +31,15 @@ export function getExpirationDate(
   return addYears(parseISO(completedDate), expiresYears).toISOString().split('T')[0]
 }
 
+// Returns null when track_expiration is off, so the course is treated as "never expires"
+export function effectiveExpiresYears(
+  expiresYears: number | null | undefined,
+  trackExpiration: boolean | undefined
+): number | null {
+  if (trackExpiration === false) return null
+  return expiresYears ?? null
+}
+
 export function getExpirationStatus(
   completedDate: string,
   expiresYears: number | null

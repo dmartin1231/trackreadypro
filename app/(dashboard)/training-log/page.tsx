@@ -6,7 +6,7 @@ import {
   Plus, Edit2, Trash2, BookOpen, X, Upload, ImageIcon,
   FileText, ChevronRight, Search, Users,
 } from 'lucide-react'
-import { formatDate, getExpirationDate, getExpirationStatus, getStatusBadge } from '@/lib/utils'
+import { formatDate, getExpirationDate, getExpirationStatus, getStatusBadge, effectiveExpiresYears } from '@/lib/utils'
 import type { Employee, Course, TrainingRecord } from '@/lib/types'
 import CertUploadModal from '@/components/cert-upload-modal'
 import { useUserRole } from '@/components/role-provider'
@@ -289,7 +289,8 @@ export default function TrainingLogPage() {
           {grouped.map(({ course, records: courseRecords }) => {
             const isExpanded = expandedCourses.has(course.id)
             const latestDate = courseRecords[0]?.completed_date
-            const statuses = courseRecords.map(r => getExpirationStatus(r.completed_date, course.expires_years))
+            const effExp = effectiveExpiresYears(course.expires_years, course.track_expiration)
+            const statuses = courseRecords.map(r => getExpirationStatus(r.completed_date, effExp))
             const expiredCount  = statuses.filter(s => s === 'expired').length
             const expiringCount = statuses.filter(s => s === 'expiring_30' || s === 'expiring_60').length
 
@@ -344,8 +345,8 @@ export default function TrainingLogPage() {
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {courseRecords.map(rec => {
-                          const expDate = getExpirationDate(rec.completed_date, course.expires_years)
-                          const status  = getExpirationStatus(rec.completed_date, course.expires_years)
+                          const expDate = getExpirationDate(rec.completed_date, effExp)
+                          const status  = getExpirationStatus(rec.completed_date, effExp)
                           const badge   = getStatusBadge(status)
                           return (
                             <tr key={rec.id} className="hover:bg-gray-50/50 transition-colors">
@@ -405,7 +406,7 @@ export default function TrainingLogPage() {
           {groupedByEmployee.map(({ employee, records: empRecords }) => {
             const isExpanded = expandedEmployees.has(employee.id)
             const latestDate = empRecords[0]?.completed_date
-            const statuses = empRecords.map(r => getExpirationStatus(r.completed_date, r.course?.expires_years ?? null))
+            const statuses = empRecords.map(r => getExpirationStatus(r.completed_date, effectiveExpiresYears(r.course?.expires_years, r.course?.track_expiration)))
             const expiredCount  = statuses.filter(s => s === 'expired').length
             const expiringCount = statuses.filter(s => s === 'expiring_30' || s === 'expiring_60').length
             const initials = employee.name.split(' ').map(n => n[0]).slice(0, 2).join('')
@@ -461,7 +462,7 @@ export default function TrainingLogPage() {
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {empRecords.map(rec => {
-                          const expiresYears = rec.course?.expires_years ?? null
+                          const expiresYears = effectiveExpiresYears(rec.course?.expires_years, rec.course?.track_expiration)
                           const expDate = getExpirationDate(rec.completed_date, expiresYears)
                           const status  = getExpirationStatus(rec.completed_date, expiresYears)
                           const badge   = getStatusBadge(status)

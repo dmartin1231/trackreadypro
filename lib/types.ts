@@ -29,6 +29,7 @@ export type Course = {
   name: string
   credit_hours: number
   expires_years: number | null // null = never expires
+  track_expiration: boolean     // false = don't show as expired/expiring anywhere
   created_at: string
 }
 
