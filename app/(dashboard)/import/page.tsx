@@ -200,13 +200,21 @@ export default function ImportPage() {
       setActiveTab('records')
       setStep('review')
 
-      // Load existing courses so the dropdown shows the full library
-      if (agencyId) {
+      // Load existing courses for the dropdown — fetch agency_id fresh here
+      // because agencyId state may not be set yet when this runs
+      try {
         const supabase = createClient()
-        const { data: existing } = await supabase
-          .from('courses').select('name').eq('agency_id', agencyId).order('name')
-        setExistingCourseNames(existing?.map(c => c.name) ?? [])
-      }
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user) {
+          const { data: profile } = await supabase
+            .from('user_profiles').select('agency_id').eq('id', user.id).single()
+          if (profile?.agency_id) {
+            const { data: existing } = await supabase
+              .from('courses').select('name').eq('agency_id', profile.agency_id).order('name')
+            setExistingCourseNames(existing?.map(c => c.name) ?? [])
+          }
+        }
+      } catch { /* non-fatal — dropdown still shows AI-detected courses */ }
     } catch (err: any) {
       setParseError(err.message)
       setStep('upload')
