@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   Upload, X, Check, Loader2, Users, BookOpen,
   ClipboardList, AlertCircle, RotateCcw, FileSpreadsheet, Info, Undo2,
-  ShieldCheck, FileText, Download, AlertTriangle,
+  ShieldCheck, FileText, Download, AlertTriangle, ImageIcon,
 } from 'lucide-react'
 
 interface ExtractedEmployee {
@@ -560,19 +560,26 @@ export default function ImportPage() {
                   <p className="font-semibold text-gray-900">Drop your training log here</p>
                   <p className="text-sm text-gray-500 mt-1">or click to browse</p>
                 </div>
-                <div className="flex items-center gap-3 mt-2">
+                <div className="flex flex-wrap items-center gap-2 mt-2 justify-center">
                   <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-100 rounded-full px-3 py-1">
-                    <FileSpreadsheet className="w-3.5 h-3.5" /> Excel (.xlsx, .xlsm, .xls)
+                    <FileSpreadsheet className="w-3.5 h-3.5" /> Excel / CSV
                   </div>
                   <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-100 rounded-full px-3 py-1">
-                    <FileSpreadsheet className="w-3.5 h-3.5" /> CSV
+                    <FileText className="w-3.5 h-3.5" /> Word (.docx)
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-100 rounded-full px-3 py-1">
+                    <FileText className="w-3.5 h-3.5" /> PDF
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs text-gray-500 bg-gray-100 rounded-full px-3 py-1">
+                    <ImageIcon className="w-3.5 h-3.5" /> Images
                   </div>
                 </div>
+                <p className="text-xs text-gray-400 mt-1">PDF, Word &amp; images use AI to extract records automatically</p>
               </div>
               <input
                 ref={fileInputRef}
                 type="file"
-                accept=".xlsx,.xlsm,.xls,.csv"
+                accept=".xlsx,.xlsm,.xls,.csv,.pdf,.docx,.doc,.jpg,.jpeg,.png,.gif,.webp,.bmp,.tiff,.tif"
                 onChange={handleFileInput}
                 className="hidden"
               />
@@ -593,7 +600,7 @@ export default function ImportPage() {
                     </div>
                     <p className="text-xs text-blue-600 mt-2">
                       Variations like "Full Name", "Training", "Date Completed", "Credit Hours" also work.
-                      Have a PDF? Export it to Excel first.
+                      PDFs, Word docs, and images are parsed automatically using AI.
                     </p>
                   </div>
                 </div>

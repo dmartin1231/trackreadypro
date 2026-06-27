@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { createClient } from '@/lib/supabase/server'
+import Anthropic from '@anthropic-ai/sdk'
+import mammoth from 'mammoth'
 
 // Fuzzy column matching — checks if the header contains or equals any pattern
 function matchColumn(header: string, patterns: string[]): boolean {
@@ -97,6 +99,140 @@ function toStr(value: unknown): string | null {
   return s || null
 }
 
+const AI_SYSTEM_PROMPT = `You are a training record extraction assistant for an employee compliance tracker.
+Extract all employee training records from the document provided and return ONLY valid JSON.
+
+Return this exact structure:
+{
+  "records": [
+    {
+      "employee_name": "Full Name",
+      "employee_number": "optional ID or null",
+      "hire_date": "YYYY-MM-DD or null",
+      "course_name": "Course / Certification Name",
+      "completed_date": "YYYY-MM-DD",
+      "hours": 1.0
+    }
+  ]
+}
+
+Rules:
+- completed_date MUST be in YYYY-MM-DD format (convert from any format you see)
+- hours must be a positive number; default to 1 if not specified
+- Include every row/entry you find — do not skip any
+- If a field is missing, use null (never omit the key)
+- Return { "records": [] } if no training records are found
+- Return ONLY the JSON object, no explanation or markdown`
+
+async function parseWithAI(file: File, ext: string): Promise<NextResponse> {
+  const apiKey = process.env.ANTHROPIC_API_KEY
+  if (!apiKey || apiKey.includes('REPLACE_ME')) {
+    return NextResponse.json(
+      { error: 'AI parsing requires an Anthropic API key. Add ANTHROPIC_API_KEY to your environment variables, or export your document as an Excel/CSV file.' },
+      { status: 400 }
+    )
+  }
+
+  const client = new Anthropic({ apiKey })
+  const buffer = Buffer.from(await file.arrayBuffer())
+
+  try {
+    let message: Anthropic.Message
+
+    if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'tif'].includes(ext)) {
+      // Image — use vision
+      const mediaType = ext === 'jpg' || ext === 'jpeg' ? 'image/jpeg'
+        : ext === 'png' ? 'image/png'
+        : ext === 'gif' ? 'image/gif'
+        : 'image/webp'
+      message = await client.messages.create({
+        model: 'claude-opus-4-8',
+        max_tokens: 4096,
+        system: AI_SYSTEM_PROMPT,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image', source: { type: 'base64', media_type: mediaType, data: buffer.toString('base64') } },
+            { type: 'text', text: 'Extract all training records from this document.' },
+          ],
+        }],
+      })
+    } else if (ext === 'pdf') {
+      // PDF — send as document
+      message = await client.messages.create({
+        model: 'claude-opus-4-8',
+        max_tokens: 4096,
+        system: AI_SYSTEM_PROMPT,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: buffer.toString('base64') } } as any,
+            { type: 'text', text: 'Extract all training records from this document.' },
+          ],
+        }],
+      })
+    } else {
+      // Word (.docx/.doc) — extract text with mammoth, then send as text
+      const result = await mammoth.extractRawText({ buffer })
+      const text = result.value.trim()
+      if (!text) return NextResponse.json({ error: 'Could not read text from Word document.' }, { status: 422 })
+      message = await client.messages.create({
+        model: 'claude-opus-4-8',
+        max_tokens: 4096,
+        system: AI_SYSTEM_PROMPT,
+        messages: [{
+          role: 'user',
+          content: `Extract all training records from this document:\n\n${text}`,
+        }],
+      })
+    }
+
+    const raw = message.content[0]?.type === 'text' ? message.content[0].text : ''
+    const jsonMatch = raw.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) return NextResponse.json({ error: 'AI could not extract structured data from this file.' }, { status: 422 })
+
+    const parsed = JSON.parse(jsonMatch[0]) as { records: Array<{
+      employee_name: string; employee_number: string | null; hire_date: string | null
+      course_name: string; completed_date: string; hours: number
+    }> }
+
+    if (!parsed.records?.length) {
+      return NextResponse.json(
+        { error: 'No training records found in this file. Make sure it contains employee names, course names, completion dates, and hours.' },
+        { status: 422 }
+      )
+    }
+
+    // Convert to the same shape the spreadsheet parser returns
+    const employeeMap = new Map<string, { name: string; employee_number: string | null; hire_date: string | null }>()
+    const courseMap   = new Map<string, { name: string; credit_hours: number; expires_years: number | null }>()
+    const training_records: Array<{ employee_name: string; course_name: string; completed_date: string; hours: number }> = []
+
+    for (const r of parsed.records) {
+      if (!r.employee_name || !r.course_name || !r.completed_date) continue
+      const empKey    = r.employee_name.toLowerCase()
+      const courseKey = r.course_name.toLowerCase()
+      if (!employeeMap.has(empKey)) {
+        employeeMap.set(empKey, { name: r.employee_name, employee_number: r.employee_number ?? null, hire_date: r.hire_date ?? null })
+      }
+      if (!courseMap.has(courseKey)) {
+        courseMap.set(courseKey, { name: r.course_name, credit_hours: r.hours ?? 1, expires_years: null })
+      }
+      training_records.push({ employee_name: r.employee_name, course_name: r.course_name, completed_date: r.completed_date, hours: r.hours ?? 1 })
+    }
+
+    return NextResponse.json({
+      employees: Array.from(employeeMap.values()),
+      courses: Array.from(courseMap.values()),
+      training_records,
+      ai_parsed: true,
+    })
+  } catch (err: any) {
+    console.error('AI parse error:', err)
+    return NextResponse.json({ error: err.message ?? 'AI parsing failed' }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -108,16 +244,16 @@ export async function POST(request: NextRequest) {
 
   const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
 
-  if (ext === 'pdf') {
-    return NextResponse.json(
-      { error: 'PDF import requires the Claude AI integration which is not currently set up. Please export your training log as an Excel (.xlsx) or CSV file and upload that instead.' },
-      { status: 400 }
-    )
+  const AI_TYPES = ['pdf', 'docx', 'doc', 'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'tiff', 'tif']
+  const SPREADSHEET_TYPES = ['xlsx', 'xls', 'xlsm', 'csv']
+
+  if (AI_TYPES.includes(ext)) {
+    return await parseWithAI(file, ext)
   }
 
-  if (!['xlsx', 'xls', 'xlsm', 'csv'].includes(ext)) {
+  if (!SPREADSHEET_TYPES.includes(ext)) {
     return NextResponse.json(
-      { error: 'Unsupported file type. Please upload an Excel file (.xlsx, .xlsm, .xls) or CSV.' },
+      { error: 'Unsupported file type. Accepted: Excel (.xlsx, .xls), CSV, Word (.docx), PDF, or images (JPG, PNG, etc.).' },
       { status: 400 }
     )
   }
