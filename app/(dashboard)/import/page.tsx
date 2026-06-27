@@ -56,6 +56,9 @@ export default function ImportPage() {
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Existing courses from DB — used to populate the course dropdown during review
+  const [existingCourseNames, setExistingCourseNames] = useState<string[]>([])
+
   // Batch tracking for undo
   const [lastBatchId, setLastBatchId] = useState<string | null>(null)
   const [undoing, setUndoing] = useState(false)
@@ -194,8 +197,16 @@ export default function ImportPage() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error ?? 'Failed to parse file')
       setData(json)
-      setActiveTab('employees')
+      setActiveTab('records')
       setStep('review')
+
+      // Load existing courses so the dropdown shows the full library
+      if (agencyId) {
+        const supabase = createClient()
+        const { data: existing } = await supabase
+          .from('courses').select('name').eq('agency_id', agencyId).order('name')
+        setExistingCourseNames(existing?.map(c => c.name) ?? [])
+      }
     } catch (err: any) {
       setParseError(err.message)
       setStep('upload')
@@ -233,6 +244,12 @@ export default function ImportPage() {
 
   const removeRecord = (i: number) =>
     setData(d => d ? { ...d, training_records: d.training_records.filter((_, idx) => idx !== i) } : d)
+
+  const updateRecord = (i: number, changes: Partial<ExtractedRecord>) =>
+    setData(d => d ? {
+      ...d,
+      training_records: d.training_records.map((r, idx) => idx === i ? { ...r, ...changes } : r),
+    } : d)
 
   const handleImport = async () => {
     if (!data) return
@@ -729,8 +746,15 @@ export default function ImportPage() {
               )}
 
               {/* Training records tab */}
-              {activeTab === 'records' && (
-                data.training_records.length === 0 ? (
+              {activeTab === 'records' && (() => {
+                // All course names: existing library + newly detected (deduplicated)
+                const extractedNames = data.courses.map(c => c.name)
+                const allCourseOptions = Array.from(new Set([
+                  ...existingCourseNames,
+                  ...extractedNames,
+                ].map(n => n.trim()))).sort((a, b) => a.localeCompare(b))
+
+                return data.training_records.length === 0 ? (
                   <p className="text-center text-gray-400 py-12 text-sm">No training records — all removed</p>
                 ) : (
                   <table className="w-full text-sm">
@@ -745,12 +769,42 @@ export default function ImportPage() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {data.training_records.map((rec, i) => (
-                        <tr key={i} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-900">{rec.employee_name}</td>
-                          <td className="px-4 py-3 text-gray-500">{rec.course_name}</td>
-                          <td className="px-4 py-3 text-gray-500">{rec.completed_date}</td>
-                          <td className="px-4 py-3 text-gray-500">{rec.hours}</td>
-                          <td className="px-4 py-3">
+                        <tr key={i} className="hover:bg-gray-50/60">
+                          <td className="px-4 py-2.5 font-medium text-gray-900 whitespace-nowrap">{rec.employee_name}</td>
+                          <td className="px-4 py-2.5">
+                            <select
+                              value={rec.course_name}
+                              onChange={e => updateRecord(i, { course_name: e.target.value })}
+                              className="w-full min-w-[200px] text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black text-gray-800"
+                            >
+                              {/* Show current value even if not in list */}
+                              {!allCourseOptions.includes(rec.course_name) && (
+                                <option value={rec.course_name}>{rec.course_name}</option>
+                              )}
+                              {allCourseOptions.map(name => (
+                                <option key={name} value={name}>{name}</option>
+                              ))}
+                            </select>
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <input
+                              type="date"
+                              value={rec.completed_date}
+                              onChange={e => updateRecord(i, { completed_date: e.target.value })}
+                              className="text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black text-gray-700"
+                            />
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <input
+                              type="number"
+                              step="0.25"
+                              min="0"
+                              value={rec.hours}
+                              onChange={e => updateRecord(i, { hours: parseFloat(e.target.value) || 0 })}
+                              className="w-20 text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black text-gray-700"
+                            />
+                          </td>
+                          <td className="px-4 py-2.5">
                             <button onClick={() => removeRecord(i)} className="text-gray-300 hover:text-red-500 transition-colors">
                               <X className="w-4 h-4" />
                             </button>
@@ -760,7 +814,7 @@ export default function ImportPage() {
                     </tbody>
                   </table>
                 )
-              )}
+              })()}
             </div>
           </div>
 
