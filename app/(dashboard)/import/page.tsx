@@ -56,9 +56,8 @@ export default function ImportPage() {
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  // Existing courses from DB — used to populate the course dropdown during review
-  const [existingCourseNames, setExistingCourseNames] = useState<string[]>([])
-  const [existingCourseHours, setExistingCourseHours] = useState<Map<string, number>>(new Map())
+  // Existing courses from DB — used to populate the dropdown + auto-fill hours
+  const [existingCourses, setExistingCourses] = useState<{ name: string; credit_hours: number }[]>([])
 
   // Batch tracking for undo
   const [lastBatchId, setLastBatchId] = useState<string | null>(null)
@@ -212,10 +211,7 @@ export default function ImportPage() {
           if (profile?.agency_id) {
             const { data: existing } = await supabase
               .from('courses').select('name, credit_hours').eq('agency_id', profile.agency_id).order('name')
-            setExistingCourseNames(existing?.map(c => c.name) ?? [])
-            const hoursMap = new Map<string, number>()
-            existing?.forEach(c => hoursMap.set(c.name, c.credit_hours))
-            setExistingCourseHours(hoursMap)
+            setExistingCourses(existing ?? [])
           }
         }
       } catch { /* non-fatal — dropdown still shows AI-detected courses */ }
@@ -759,16 +755,13 @@ export default function ImportPage() {
 
               {/* Training records tab */}
               {activeTab === 'records' && (() => {
-                // All course names: existing library + newly detected (deduplicated)
-                const extractedNames = data.courses.map(c => c.name)
-                const allCourseOptions = Array.from(new Set([
-                  ...existingCourseNames,
-                  ...extractedNames,
-                ].map(n => n.trim()))).sort((a, b) => a.localeCompare(b))
-
-                // Combined hours lookup: existing DB courses + AI-detected courses
-                const courseHoursLookup = new Map<string, number>(existingCourseHours)
-                data.courses.forEach(c => { if (!courseHoursLookup.has(c.name)) courseHoursLookup.set(c.name, c.credit_hours) })
+                // All course options: existing library + newly detected (deduplicated, sorted)
+                const allCourseOptions = Array.from(
+                  new Map([
+                    ...existingCourses.map(c => [c.name, c.credit_hours] as [string, number]),
+                    ...data.courses.map(c => [c.name, c.credit_hours] as [string, number]),
+                  ])
+                ).sort((a, b) => a[0].localeCompare(b[0]))
 
                 return data.training_records.length === 0 ? (
                   <p className="text-center text-gray-400 py-12 text-sm">No training records — all removed</p>
@@ -792,16 +785,17 @@ export default function ImportPage() {
                               value={rec.course_name}
                               onChange={e => {
                                 const name = e.target.value
-                                const hrs = courseHoursLookup.get(name)
+                                const found = allCourseOptions.find(([n]) => n === name)
+                                const hrs = found?.[1]
                                 updateRecord(i, { course_name: name, ...(hrs !== undefined ? { hours: hrs } : {}) })
                               }}
                               className="w-full min-w-[200px] text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black text-gray-800"
                             >
                               {/* Show current value even if not in list */}
-                              {!allCourseOptions.includes(rec.course_name) && (
+                              {!allCourseOptions.find(([n]) => n === rec.course_name) && (
                                 <option value={rec.course_name}>{rec.course_name}</option>
                               )}
-                              {allCourseOptions.map(name => (
+                              {allCourseOptions.map(([name]) => (
                                 <option key={name} value={name}>{name}</option>
                               ))}
                             </select>
