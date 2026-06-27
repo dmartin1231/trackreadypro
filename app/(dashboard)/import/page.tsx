@@ -58,6 +58,7 @@ export default function ImportPage() {
 
   // Existing courses from DB — used to populate the course dropdown during review
   const [existingCourseNames, setExistingCourseNames] = useState<string[]>([])
+  const [existingCourseHours, setExistingCourseHours] = useState<Map<string, number>>(new Map())
 
   // Batch tracking for undo
   const [lastBatchId, setLastBatchId] = useState<string | null>(null)
@@ -210,8 +211,11 @@ export default function ImportPage() {
             .from('user_profiles').select('agency_id').eq('id', user.id).single()
           if (profile?.agency_id) {
             const { data: existing } = await supabase
-              .from('courses').select('name').eq('agency_id', profile.agency_id).order('name')
+              .from('courses').select('name, credit_hours').eq('agency_id', profile.agency_id).order('name')
             setExistingCourseNames(existing?.map(c => c.name) ?? [])
+            const hoursMap = new Map<string, number>()
+            existing?.forEach(c => hoursMap.set(c.name, c.credit_hours))
+            setExistingCourseHours(hoursMap)
           }
         }
       } catch { /* non-fatal — dropdown still shows AI-detected courses */ }
@@ -762,6 +766,10 @@ export default function ImportPage() {
                   ...extractedNames,
                 ].map(n => n.trim()))).sort((a, b) => a.localeCompare(b))
 
+                // Combined hours lookup: existing DB courses + AI-detected courses
+                const courseHoursLookup = new Map<string, number>(existingCourseHours)
+                data.courses.forEach(c => { if (!courseHoursLookup.has(c.name)) courseHoursLookup.set(c.name, c.credit_hours) })
+
                 return data.training_records.length === 0 ? (
                   <p className="text-center text-gray-400 py-12 text-sm">No training records — all removed</p>
                 ) : (
@@ -782,7 +790,11 @@ export default function ImportPage() {
                           <td className="px-4 py-2.5">
                             <select
                               value={rec.course_name}
-                              onChange={e => updateRecord(i, { course_name: e.target.value })}
+                              onChange={e => {
+                                const name = e.target.value
+                                const hrs = courseHoursLookup.get(name)
+                                updateRecord(i, { course_name: name, ...(hrs !== undefined ? { hours: hrs } : {}) })
+                              }}
                               className="w-full min-w-[200px] text-sm border border-gray-200 rounded-lg px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-black/20 focus:border-black text-gray-800"
                             >
                               {/* Show current value even if not in list */}
